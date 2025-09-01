@@ -1,26 +1,65 @@
 package co.com.crediya.model.user;
 import lombok.Builder;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Objects;
 
-import lombok.AllArgsConstructor;
+import co.com.crediya.model.valueobject.BaseSalary;
+import co.com.crediya.model.valueobject.Email;
+import co.com.crediya.model.valueobject.ProperName;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder(toBuilder = true)
 public class User {
-    private String id;
-    private String firstName;
-    private String lastName;
-    private LocalDate birthDate;
-    private String address;
-    private String phone;
-    private String email;
-    private BigDecimal baseSalary;
+    private final String id;
+    private final ProperName firstName;
+    private final ProperName lastName;
+    private  LocalDate birthDate;
+    private  String address;
+    private  String phone;
+    private final Email email;
+    private final BaseSalary baseSalary;
+
+
+    public User(String id, ProperName firstName, ProperName lastName,
+                       LocalDate birthDate, String address,
+                       String phone, Email email, BaseSalary baseSalary) {
+        
+        this.id = id;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.birthDate=birthDate;
+        this.address=address;
+        this.phone=phone;
+        this.email = email;
+        this.baseSalary = baseSalary;
+    }
+
+    public User(String id, ProperName firstName, ProperName lastName, Email email, BaseSalary baseSalary){
+        this.id = id;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.email = email;
+        this.baseSalary = baseSalary;
+    }
+
+    public String getFullName() {
+        return firstName.getValue() + " " + lastName.getValue();
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    @Override
+    public String toString() {
+        return "Usuario{" +
+                "id=" + id +
+                ", name=" + firstName +
+                ", email=" + email +
+                '}';
+    }
+
 }
