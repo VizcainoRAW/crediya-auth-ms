@@ -12,7 +12,7 @@ import lombok.Getter;
 @Getter
 @Builder(toBuilder = true)
 public class User {
-    private final String id;
+    private String id;
     private final ProperName firstName;
     private final ProperName lastName;
     private  LocalDate birthDate;
@@ -36,8 +36,27 @@ public class User {
         this.baseSalary = baseSalary;
     }
 
+    public User(ProperName firstName, ProperName lastName,
+                       LocalDate birthDate, String address,
+                       String phone, Email email, BaseSalary baseSalary) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.birthDate=birthDate;
+        this.address=address;
+        this.phone=phone;
+        this.email = email;
+        this.baseSalary = baseSalary;
+    }
+
     public User(String id, ProperName firstName, ProperName lastName, Email email, BaseSalary baseSalary){
         this.id = id;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.email = email;
+        this.baseSalary = baseSalary;
+    }
+
+    public User(ProperName firstName, ProperName lastName, Email email, BaseSalary baseSalary){
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
@@ -50,14 +69,13 @@ public class User {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id);
+        return Objects.hash(email);
     }
 
     @Override
     public String toString() {
         return "Usuario{" +
-                "id=" + id +
-                ", name=" + firstName +
+                ", name=" + getFullName() +
                 ", email=" + email +
                 '}';
     }
