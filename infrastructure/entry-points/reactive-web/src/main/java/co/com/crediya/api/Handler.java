@@ -122,6 +122,46 @@ public class Handler {
                 .onErrorResume(throwable -> handleError(throwable, request.path()));
     }
 
+    public Mono<ServerResponse> checkUserExistsById(ServerRequest request) {
+        return Mono.fromCallable(() -> request.pathVariable("id"))
+                .flatMap(userId -> {
+                    log.debug("Checking if user exists with ID: {}", userId);
+                    
+                    // Validar que el ID no esté vacío
+                    if (userId == null || userId.trim().isEmpty()) {
+                        return ServerResponse.badRequest()
+                                .bodyValue(ApiResponse.error("User ID cannot be empty"));
+                    }
+                    
+                    return userUseCase.userExistsById(userId)
+                            .map(exists -> ApiResponse.success(exists, 
+                                exists ? "User exists" : "User does not exist"))
+                            .flatMap(response -> ServerResponse.ok().bodyValue(response));
+                })
+                .onErrorResume(throwable -> handleError(throwable, request.path()));
+    }
+
+    public Mono<ServerResponse> checkUserExistsByIdQuery(ServerRequest request) {
+        return request.queryParam("id")
+                .map(userId -> {
+                    log.debug("Checking if user exists with ID: {}", userId);
+                    
+                    // Validar que el ID no esté vacío
+                    if (userId.trim().isEmpty()) {
+                        return ServerResponse.badRequest()
+                                .bodyValue(ApiResponse.error("User ID cannot be empty"));
+                    }
+                    
+                    return userUseCase.userExistsById(userId)
+                            .map(exists -> ApiResponse.success(exists, 
+                                exists ? "User exists" : "User does not exist"))
+                            .flatMap(response -> ServerResponse.ok().bodyValue(response));
+                })
+                .orElse(ServerResponse.badRequest()
+                        .bodyValue(ApiResponse.error("ID parameter is required")))
+                .onErrorResume(throwable -> handleError(throwable, request.path()));
+    }
+
     private Mono<UserDTO> validateCreateRequest(UserDTO dto) {
         if (dto.firstName() == null || dto.firstName().trim().isEmpty()) {
             return Mono.error(new InvalidUserDataException("First name is required"));

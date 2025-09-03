@@ -19,6 +19,8 @@ public class RouterRest {
                 .andRoute(GET("/api/users/{id}"), handler::getUserById)
                 .andRoute(GET("/api/users/search"), handler::getUserByEmail)
                 .andRoute(PUT("/api/users/{id}"), handler::updateUser)
-                .andRoute(GET("/api/users/exists"), handler::checkUserExists);
+                .andRoute(GET("/api/users/exists"), handler::checkUserExists)
+                .andRoute(GET("/api/users/{id}/exists"), handler::checkUserExistsById)
+                .andRoute(GET("/api/users/exists/by-id"), handler::checkUserExistsByIdQuery);
         }
 }
