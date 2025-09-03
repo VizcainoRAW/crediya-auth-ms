@@ -3,6 +3,8 @@ package co.com.crediya.model.valueobject;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
+import co.com.crediya.model.valueobject.exception.InvalidEmailFormatException;
+
 public class Email {
     
     private final String value;
@@ -13,11 +15,11 @@ public class Email {
 
     public Email(String value){
         if(value == null || value.trim().isBlank()){
-            throw new IllegalArgumentException("Email cannot be null or empty");
+            throw new InvalidEmailFormatException();
         }
 
         if (!EMAIL_PATTERN.matcher(value).matches()) {
-            throw new IllegalArgumentException("Not a valid email format");
+            throw new InvalidEmailFormatException(value);
         }
 
         this.value = value.trim().toLowerCase();

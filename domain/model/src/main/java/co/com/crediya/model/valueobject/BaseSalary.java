@@ -3,6 +3,8 @@ package co.com.crediya.model.valueobject;
 import java.math.BigDecimal;
 import java.util.Objects;
 
+import co.com.crediya.model.valueobject.exception.InvalidBaseSalaryException;
+
 public class BaseSalary {
 
     private final BigDecimal value;
@@ -12,11 +14,15 @@ public class BaseSalary {
 
     public BaseSalary(BigDecimal value){
         if (value == null) {
-        throw new IllegalArgumentException("Base salary cannot be null");
+            throw new InvalidBaseSalaryException();
         }
 
-        if (value.compareTo(MIN_SALARY) < 0 || value.compareTo(MAX_SALARY) > 0) {
-            throw new IllegalArgumentException("Base salary have to be between "+ MIN_SALARY + " and " + MAX_SALARY );
+        if (value.compareTo(MIN_SALARY) < 0) {
+            throw new InvalidBaseSalaryException("cannot be less than " + MIN_SALARY);
+        }
+        
+        if (value.compareTo(MAX_SALARY) > 0) {
+            throw new InvalidBaseSalaryException("cannot exceed " + MAX_SALARY);
         }
         this.value = value;
     }

@@ -2,6 +2,8 @@ package co.com.crediya.model.valueobject;
 
 import java.util.Objects;
 
+import co.com.crediya.model.valueobject.exception.InvalidProperNameException;
+
 public class ProperName {
     
     private final String value;
@@ -11,15 +13,15 @@ public class ProperName {
 
     public ProperName(String value, String field){
         if(value == null || value.trim().isBlank()){
-            throw new IllegalArgumentException("The field " + field + " cannot be null or empty.");
+            throw new InvalidProperNameException(field);
         }
 
         if (value.length() < MIN_NAME_LENGTH) {
-            throw new IllegalArgumentException("The field " + field + " cannot less than " + MIN_NAME_LENGTH + " characters.");            
+            throw new InvalidProperNameException(field, MIN_NAME_LENGTH, MAX_NAME_LENGTH);       
         }
 
         if (value.length() > MAX_NAME_LENGTH) {
-        throw new IllegalArgumentException("The field " + field + " cannot exceed " + MAX_NAME_LENGTH + " characters.");
+            throw new InvalidProperNameException(field, MIN_NAME_LENGTH, MAX_NAME_LENGTH);
         }
 
         this.value = capitalize(value.trim());
