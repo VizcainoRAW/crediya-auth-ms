@@ -1,5 +1,7 @@
 package co.com.crediya.r2dbc.helper;
 
+import java.util.UUID;
+
 import org.springframework.stereotype.Component;
 
 import co.com.crediya.model.user.User;
@@ -28,7 +30,7 @@ public class UserDomainMapper {
             BaseSalary baseSalary = new BaseSalary(entity.getBaseSalary());
             
             return User.builder()
-                    .id(entity.getId())
+                    .id(entity.getId().toString())
                     .firstName(firstName)
                     .lastName(lastName)
                     .birthDate(entity.getBirthDate())
@@ -53,7 +55,7 @@ public class UserDomainMapper {
         }
         
         UserEntity entity = new UserEntity();
-        entity.setId(user.getId());
+        entity.setId(user.getId() != null ? UUID.fromString(user.getId()) : null);
         entity.setFirstName(user.getFirstName().getValue());
         entity.setLastName(user.getLastName().getValue());
         entity.setBirthDate(user.getBirthDate());

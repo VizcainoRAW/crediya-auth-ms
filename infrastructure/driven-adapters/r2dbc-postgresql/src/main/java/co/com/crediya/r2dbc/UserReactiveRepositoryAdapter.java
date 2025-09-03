@@ -10,6 +10,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import org.slf4j.Logger;
+
+import java.util.UUID;
+
 import org.reactivecommons.utils.ObjectMapper;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
@@ -20,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserReactiveRepositoryAdapter extends ReactiveAdapterOperations<
     User /* domain model */,
     UserEntity /* adapter model */,
-    String,
+    UUID,
     UserReactiveRepository
 > implements UserRepository {
 
@@ -64,21 +67,23 @@ public class UserReactiveRepositoryAdapter extends ReactiveAdapterOperations<
     }
 
     @Override
+    public Mono<User> findById(String id){
+        return super.findById(UUID.fromString(id));
+    }
+
+    @Override
     public Mono<User> findByEmail(Email email) {
         logger.debug("Finding user by email: {}", email.getValue());
         
         return repository.findByEmail(email.getValue())
-                .map(this::toEntity)
-                .doOnSuccess(user -> {
-                    if (user != null) {
-                        logger.debug("User found with email: {}", email.getValue());
-                    } else {
-                        logger.debug("No user found with email: {}", email.getValue());
-                    }
-                })
-                .doOnError(error -> logger.error("Error finding user by email: {}", email.getValue(), error))
-                .onErrorMap(Exception.class, ex -> 
-                    new RuntimeException("Failed to find user by email: " + email.getValue(), ex));
+        .map(domainMapper::entityToDomain)
+        .doOnSuccess(user -> logger.debug("User found with email: {}", email.getValue()))
+        .switchIfEmpty(Mono.fromRunnable(() ->
+                logger.debug("No user found with email: {}", email.getValue())))
+        .doOnError(error -> logger.error("Error finding user by email: {}", email.getValue(), error))
+        .onErrorMap(Exception.class, ex ->
+                new RuntimeException("Failed to find user by email: " + email.getValue(), ex));
+
     }
 
     @Override
@@ -93,7 +98,7 @@ public class UserReactiveRepositoryAdapter extends ReactiveAdapterOperations<
     }
 
     @Transactional
-    public Mono<Void> deleteById(String id) {
+    public Mono<Void> deleteById(UUID id) {
         logger.debug("Deleting user with id: {}", id);
         
         return repository.deleteById(id)

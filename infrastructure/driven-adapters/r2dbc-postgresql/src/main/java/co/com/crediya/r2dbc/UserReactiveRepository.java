@@ -1,5 +1,7 @@
 package co.com.crediya.r2dbc;
 
+import java.util.UUID;
+
 import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.query.ReactiveQueryByExampleExecutor;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
@@ -7,7 +9,7 @@ import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import co.com.crediya.r2dbc.entity.UserEntity;
 import reactor.core.publisher.Mono;
 
-public interface UserReactiveRepository extends ReactiveCrudRepository<UserEntity, String>, ReactiveQueryByExampleExecutor<UserEntity> {
+public interface UserReactiveRepository extends ReactiveCrudRepository<UserEntity, UUID>, ReactiveQueryByExampleExecutor<UserEntity> {
 
     /**
      * Find user by email
