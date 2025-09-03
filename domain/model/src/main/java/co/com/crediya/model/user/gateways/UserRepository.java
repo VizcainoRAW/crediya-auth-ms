@@ -14,6 +14,11 @@ public interface UserRepository {
      */
     Mono<User> save(User user);
 
+    /**
+     * Finds all users
+     * @param user User to be saved
+     * @return Mono with the saved user
+     */
     Flux<User> findAll();
 
     /**
