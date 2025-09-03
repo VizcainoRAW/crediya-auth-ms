@@ -19,11 +19,19 @@ public class BaseSalary {
 
         if (value.compareTo(MIN_SALARY) < 0) {
             throw new InvalidBaseSalaryException("cannot be less than " + MIN_SALARY);
+<<<<<<< HEAD
+        }
+        
+        if (value.compareTo(MAX_SALARY) > 0) {
+            throw new InvalidBaseSalaryException("cannot exceed " + MAX_SALARY);
+=======
+>>>>>>> f019b17 (feat(domain): add domain, value object and business rules exceptions)
         }
         
         if (value.compareTo(MAX_SALARY) > 0) {
             throw new InvalidBaseSalaryException("cannot exceed " + MAX_SALARY);
         }
+        
         this.value = value;
     }
 
