@@ -10,11 +10,12 @@ import reactor.core.publisher.Mono;
 
 import co.com.crediya.api.dto.ApiResponse;
 import co.com.crediya.api.dto.ErrorResponse;
-import co.com.crediya.api.dto.UserDTO;
+import co.com.crediya.api.dto.UserRequestDTO;
 import co.com.crediya.api.mapper.UserMapper;
 import co.com.crediya.model.user.exception.InvalidUserDataException;
 import co.com.crediya.model.user.exception.UserAlreadyExistsException;
 import co.com.crediya.model.user.exception.UserNotFoundException;
+import co.com.crediya.model.valueobject.DocumentId;
 import co.com.crediya.model.valueobject.Email;
 import co.com.crediya.model.valueobject.exception.ValueObjectException;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,7 +33,7 @@ public class Handler {
     private final UserUseCase userUseCase;
 
     public Mono<ServerResponse> createUser(ServerRequest request) {
-        return request.bodyToMono(UserDTO.class)
+        return request.bodyToMono(UserRequestDTO.class)
                 .doOnNext(dto -> log.debug("Creating user: {}", dto.email()))
                 .flatMap(this::validateCreateRequest)
                 .map(UserMapper::toUser)
@@ -85,19 +86,39 @@ public class Handler {
                 .onErrorResume(throwable -> handleError(throwable, request.path()));
     }
 
-    public Mono<ServerResponse> updateUser(ServerRequest request) {
-        String userId = request.pathVariable("id");
-        log.debug("Updating user with ID: {}", userId);
-        
-        return request.bodyToMono(UserDTO.class)
-                .flatMap(dto -> validateUpdateRequest(dto, userId))
-                .map(dto -> new UserDTO(userId, dto.firstName(), dto.lastName(), 
-                        dto.birthDate(), dto.address(), dto.phone(), dto.email(), dto.baseSalary()))
-                .map(UserMapper::toUser)
-                .flatMap(user -> userUseCase.updateUser(userId, user))
-                .map(UserMapper::toDTO)
-                .map(userDto -> ApiResponse.success(userDto, "User updated successfully"))
-                .flatMap(response -> ServerResponse.ok().bodyValue(response))
+    public Mono<ServerResponse> getUserByDocumentId(ServerRequest request) {
+        return request.queryParam("documentId")
+                .<Mono<ServerResponse>>map(documentIdValue -> {
+                    log.debug("Getting user by document ID: {}", documentIdValue);
+                    try {
+                        DocumentId documentId = new DocumentId(documentIdValue);
+                        return userUseCase.findUserByDocumentId(documentId)
+                                .map(UserMapper::toDTO)
+                                .map(userDto -> ApiResponse.success(userDto, "User found successfully"))
+                                .flatMap(response -> ServerResponse.ok().bodyValue(response));
+                    } catch (ValueObjectException e) {
+                        log.warn("Invalid document ID format: {}", documentIdValue);
+                        return ServerResponse.badRequest()
+                                .bodyValue(ApiResponse.error("Invalid document ID format: " + documentIdValue));
+                    }
+                })
+                .orElse(ServerResponse.badRequest()
+                        .bodyValue(ApiResponse.error("Document ID parameter is required")))
+                .onErrorResume(throwable -> handleError(throwable, request.path()));
+    }
+
+    public Mono<ServerResponse> getUsersByRole(ServerRequest request) {
+        return request.queryParam("role")
+                .map(roleValue -> {
+                    log.debug("Getting users by role: {}", roleValue);
+                    return userUseCase.findUsersByRole(roleValue)
+                            .map(UserMapper::toDTO)
+                            .collectList()
+                            .map(users -> ApiResponse.success(users, "Users found successfully"))
+                            .flatMap(response -> ServerResponse.ok().bodyValue(response));
+                })
+                .orElse(ServerResponse.badRequest()
+                        .bodyValue(ApiResponse.error("Role parameter is required")))
                 .onErrorResume(throwable -> handleError(throwable, request.path()));
     }
 
@@ -122,12 +143,32 @@ public class Handler {
                 .onErrorResume(throwable -> handleError(throwable, request.path()));
     }
 
+    public Mono<ServerResponse> checkUserExistsByDocumentId(ServerRequest request) {
+        return request.queryParam("documentId")
+                .map(documentIdValue -> {
+                    log.debug("Checking if user exists with document ID: {}", documentIdValue);
+                    try {
+                        DocumentId documentId = new DocumentId(documentIdValue);
+                        return userUseCase.userExistsByDocumentId(documentId)
+                                .map(exists -> ApiResponse.success(exists, 
+                                    exists ? "User exists" : "User does not exist"))
+                                .flatMap(response -> ServerResponse.ok().bodyValue(response));
+                    } catch (ValueObjectException e) {
+                        log.warn("Invalid document ID format: {}", documentIdValue);
+                        return ServerResponse.badRequest()
+                                .bodyValue(ApiResponse.error("Invalid document ID format: " + documentIdValue));
+                    }
+                })
+                .orElse(ServerResponse.badRequest()
+                        .bodyValue(ApiResponse.error("Document ID parameter is required")))
+                .onErrorResume(throwable -> handleError(throwable, request.path()));
+    }
+
     public Mono<ServerResponse> checkUserExistsById(ServerRequest request) {
         return Mono.fromCallable(() -> request.pathVariable("id"))
                 .flatMap(userId -> {
                     log.debug("Checking if user exists with ID: {}", userId);
                     
-                    // Validar que el ID no esté vacío
                     if (userId == null || userId.trim().isEmpty()) {
                         return ServerResponse.badRequest()
                                 .bodyValue(ApiResponse.error("User ID cannot be empty"));
@@ -146,7 +187,6 @@ public class Handler {
                 .map(userId -> {
                     log.debug("Checking if user exists with ID: {}", userId);
                     
-                    // Validar que el ID no esté vacío
                     if (userId.trim().isEmpty()) {
                         return ServerResponse.badRequest()
                                 .bodyValue(ApiResponse.error("User ID cannot be empty"));
@@ -162,7 +202,26 @@ public class Handler {
                 .onErrorResume(throwable -> handleError(throwable, request.path()));
     }
 
-    private Mono<UserDTO> validateCreateRequest(UserDTO dto) {
+    public Mono<ServerResponse> authenticateUser(ServerRequest request) {
+        return request.bodyToMono(LoginRequestDTO.class)
+                .flatMap(dto -> {
+                    log.debug("Authenticating user: {}", dto.email());
+                    try {
+                        Email email = new Email(dto.email());
+                        return userUseCase.authenticateUser(email, dto.password())
+                                .map(UserMapper::toAuthDTO)
+                                .map(authDto -> ApiResponse.success(authDto, "Authentication successful"))
+                                .flatMap(response -> ServerResponse.ok().bodyValue(response));
+                    } catch (ValueObjectException e) {
+                        log.warn("Invalid email format: {}", dto.email());
+                        return ServerResponse.badRequest()
+                                .bodyValue(ApiResponse.error("Invalid email format"));
+                    }
+                })
+                .onErrorResume(throwable -> handleError(throwable, request.path()));
+    }
+
+    private Mono<UserRequestDTO> validateCreateRequest(UserRequestDTO dto) {
         if (dto.firstName() == null || dto.firstName().trim().isEmpty()) {
             return Mono.error(new InvalidUserDataException("First name is required"));
         }
@@ -172,17 +231,16 @@ public class Handler {
         if (dto.email() == null || dto.email().trim().isEmpty()) {
             return Mono.error(new InvalidUserDataException("Email is required"));
         }
+        if (dto.password() == null || dto.password().trim().isEmpty()) {
+            return Mono.error(new InvalidUserDataException("Password is required"));
+        }
+        if (dto.role() == null || dto.role().trim().isEmpty()) {
+            return Mono.error(new InvalidUserDataException("Role is required"));
+        }
         if (dto.baseSalary() == null) {
             return Mono.error(new InvalidUserDataException("Base salary is required"));
         }
         return Mono.just(dto);
-    }
-
-    private Mono<UserDTO> validateUpdateRequest(UserDTO dto, String userId) {
-        if (userId == null || userId.trim().isEmpty()) {
-            return Mono.error(new InvalidUserDataException("User ID is required"));
-        }
-        return validateCreateRequest(dto);
     }
 
     private Mono<ServerResponse> handleError(Throwable throwable, String path) {
@@ -210,4 +268,6 @@ public class Handler {
     private ErrorResponse createErrorResponse(String message, String errorCode, String path) {
         return new ErrorResponse(message, errorCode, LocalDateTime.now(), path);
     }
+
+    public record LoginRequestDTO(String email, String password) {}
 }

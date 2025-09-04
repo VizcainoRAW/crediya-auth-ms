@@ -1,12 +1,17 @@
 package co.com.crediya.usecase.user;
 
 import co.com.crediya.model.user.User;
+import co.com.crediya.model.user.gateways.PasswordEncoderService;
 import co.com.crediya.model.user.gateways.UserRepository;
 import co.com.crediya.model.user.exception.UserAlreadyExistsException;
 import co.com.crediya.model.user.exception.UserNotFoundException;
 import co.com.crediya.model.user.exception.InvalidUserDataException;
+import co.com.crediya.model.user.exception.AuthenticationException;
 import co.com.crediya.model.valueobject.Email;
+import co.com.crediya.model.valueobject.Password;
 import lombok.RequiredArgsConstructor;
+import co.com.crediya.model.valueobject.DocumentId;
+import co.com.crediya.model.user.Role;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -14,12 +19,14 @@ import reactor.core.publisher.Mono;
 public class UserUseCase {
     
     private final UserRepository userRepository;
+    private final PasswordEncoderService passwordEncoder;
 
     /**
-     * Creates a new user
+     * Creates a new user with authentication fields
      * @param user User to be created
      * @return Mono with the created user
      * @throws UserAlreadyExistsException if user with email already exists
+     * @throws UserAlreadyExistsException if user with document ID already exists
      */
     public Mono<User> createUser(User user) {
         if (user == null) {
@@ -27,11 +34,23 @@ public class UserUseCase {
         }
         
         return userRepository.existsByEmail(user.getEmail())
-                .flatMap(exists -> {
-                    if (exists) {
-                        return Mono.error(new UserAlreadyExistsException(user.getEmail().getValue()));
+                .flatMap(emailExists -> {
+                    if (emailExists) {
+                        return Mono.error(new UserAlreadyExistsException("User with email already exists: " + user.getEmail().getValue()));
                     }
-                    return userRepository.save(user);
+                    
+                    if (user.getDocumentId() != null) {
+                        return userRepository.existsByDocumentId(user.getDocumentId());
+                    }
+                    return Mono.just(false);
+                })
+                .flatMap(documentExists -> {
+                    if (documentExists) {
+                        return Mono.error(new UserAlreadyExistsException("User with document ID already exists: " + user.getDocumentId().getMaskedValue()));
+                    }
+                    
+                    User userWithHashedPassword = hashPasswordForUser(user);
+                    return userRepository.save(userWithHashedPassword);
                 });
     }
 
@@ -47,7 +66,7 @@ public class UserUseCase {
         }
         
         return userRepository.findById(id)
-                .switchIfEmpty(Mono.error(new UserNotFoundException(id)));
+                .switchIfEmpty(Mono.error(new UserNotFoundException("User not found with ID: " + id)));
     }
 
     /**
@@ -62,7 +81,40 @@ public class UserUseCase {
         }
         
         return userRepository.findByEmail(email)
-                .switchIfEmpty(Mono.error(new UserNotFoundException("email", email.getValue())));
+                .switchIfEmpty(Mono.error(new UserNotFoundException("User not found with email: " + email.getValue())));
+    }
+
+    /**
+     * Finds a user by their document ID
+     * @param documentId Document ID to search
+     * @return Mono with the found user
+     * @throws UserNotFoundException if user is not found
+     */
+    public Mono<User> findUserByDocumentId(DocumentId documentId) {
+        if (documentId == null) {
+            return Mono.error(new InvalidUserDataException("Document ID cannot be null"));
+        }
+        
+        return userRepository.findByDocumentId(documentId)
+                .switchIfEmpty(Mono.error(new UserNotFoundException("User not found with document ID: " + documentId.getMaskedValue())));
+    }
+
+    /**
+     * Finds users by their role
+     * @param roleCode Role code to search
+     * @return Flux with users having the specified role
+     */
+    public Flux<User> findUsersByRole(String roleCode) {
+        if (roleCode == null || roleCode.trim().isEmpty()) {
+            return Flux.error(new InvalidUserDataException("Role code cannot be null or empty"));
+        }
+        
+        try {
+            Role role = Role.fromCode(roleCode);
+            return userRepository.findByRole(role);
+        } catch (IllegalArgumentException e) {
+            return Flux.error(new InvalidUserDataException("Invalid role code: " + roleCode));
+        }
     }
 
     /**
@@ -74,59 +126,36 @@ public class UserUseCase {
     }
 
     /**
-     * Updates an existing user
-     * @param userId ID of the user to update
-     * @param updatedUser User data to update
-     * @return Mono with the updated user
-     * @throws UserNotFoundException if user not found
-     * @throws UserAlreadyExistsException if email conflict
-     * @throws InvalidUserDataException if input data is invalid
+     * Authenticates a user with email and password
+     * @param email User email
+     * @param password Plain text password
+     * @return Mono with the authenticated user
+     * @throws AuthenticationException if authentication fails
      */
-    public Mono<User> updateUser(String userId, User updatedUser) {
-        if (userId == null || userId.trim().isEmpty()) {
-            return Mono.error(new InvalidUserDataException("User ID cannot be null or empty"));
+    public Mono<User> authenticateUser(Email email, String password) {
+        if (email == null) {
+            return Mono.error(new InvalidUserDataException("Email cannot be null"));
         }
         
-        if (updatedUser == null) {
-            return Mono.error(new InvalidUserDataException("Updated user data cannot be null"));
+        if (password == null || password.trim().isEmpty()) {
+            return Mono.error(new InvalidUserDataException("Password cannot be null or empty"));
         }
         
-        return userRepository.findById(userId)
-                .switchIfEmpty(Mono.error(new UserNotFoundException(userId)))
-                .flatMap(existingUser -> {
-                    // Check if email is being changed and if new email already exists
-                    if (!existingUser.getEmail().equals(updatedUser.getEmail())) {
-                        return userRepository.existsByEmail(updatedUser.getEmail())
-                                .flatMap(emailExists -> {
-                                    if (emailExists) {
-                                        return Mono.error(new UserAlreadyExistsException(
-                                            updatedUser.getEmail().getValue()));
-                                    }
-                                    return saveUpdatedUser(userId, updatedUser);
-                                });
-                    }
-                    return saveUpdatedUser(userId, updatedUser);
-                });
-    }
-
-    /**
-     * Deletes a user by ID
-     * @param userId ID of the user to delete
-     * @return Mono with the deleted user
-     * @throws UserNotFoundException if user not found
-     * @throws InvalidUserDataException if user ID is invalid
-     */
-    public Mono<User> deleteUser(String userId) {
-        if (userId == null || userId.trim().isEmpty()) {
-            return Mono.error(new InvalidUserDataException("User ID cannot be null or empty"));
-        }
-        
-        return userRepository.findById(userId)
-                .switchIfEmpty(Mono.error(new UserNotFoundException(userId)))
+        return userRepository.findByEmail(email)
+                .switchIfEmpty(Mono.error(new AuthenticationException("Invalid email or password")))
                 .flatMap(user -> {
-                    // Assuming you add a delete method to the repository
-                    // return userRepository.deleteById(userId).thenReturn(user);
-                    return Mono.just(user); // Placeholder for actual delete operation
+                    if (user.getPassword() == null) {
+                        return Mono.error(new AuthenticationException("User has no password set"));
+                    }
+                    
+                    // Verify password
+                    boolean passwordMatches = passwordEncoder.matches(password, user.getPassword().getValue());
+                    
+                    if (passwordMatches) {
+                        return Mono.just(user);
+                    } else {
+                        return Mono.error(new AuthenticationException("Invalid email or password"));
+                    }
                 });
     }
 
@@ -145,6 +174,20 @@ public class UserUseCase {
     }
 
     /**
+     * Checks if a user exists by document ID
+     * @param documentId Document ID to verify
+     * @return Mono with true if exists, false otherwise
+     * @throws InvalidUserDataException if document ID is null
+     */
+    public Mono<Boolean> userExistsByDocumentId(DocumentId documentId) {
+        if (documentId == null) {
+            return Mono.error(new InvalidUserDataException("Document ID cannot be null"));
+        }
+        
+        return userRepository.existsByDocumentId(documentId);
+    }
+
+    /**
      * Checks if a user exists by ID
      * @param id User ID to verify
      * @return Mono with true if exists, false otherwise
@@ -159,23 +202,46 @@ public class UserUseCase {
                 .hasElement();
     }
 
-    private Mono<User> saveUpdatedUser(String userId, User updatedUser) {
-        try {
-            // Create updated user with the same ID
-            User userToUpdate = User.builder()
-                    .id(userId)
-                    .firstName(updatedUser.getFirstName())
-                    .lastName(updatedUser.getLastName())
-                    .birthDate(updatedUser.getBirthDate())
-                    .address(updatedUser.getAddress())
-                    .phone(updatedUser.getPhone())
-                    .email(updatedUser.getEmail())
-                    .baseSalary(updatedUser.getBaseSalary())
-                    .build();
-                    
-            return userRepository.save(userToUpdate);
-        } catch (Exception e) {
-            return Mono.error(new InvalidUserDataException("Failed to build updated user", e));
+    /**
+     * Finds users with elevated privileges (ADMIN or MANAGER roles)
+     * @return Flux with users having elevated privileges
+     */
+    public Flux<User> findUsersWithElevatedPrivileges() {
+        return userRepository.findUsersWithElevatedPrivileges();
+    }
+
+    /**
+     * Counts users by role
+     * @param roleCode Role code to count
+     * @return Mono with the count
+     */
+    public Mono<Long> countUsersByRole(String roleCode) {
+        if (roleCode == null || roleCode.trim().isEmpty()) {
+            return Mono.error(new InvalidUserDataException("Role code cannot be null or empty"));
         }
+        
+        try {
+            Role role = Role.fromCode(roleCode);
+            return userRepository.countUsersByRole(role);
+        } catch (IllegalArgumentException e) {
+            return Mono.error(new InvalidUserDataException("Invalid role code: " + roleCode));
+        }
+    }
+
+    /**
+     * Helper method to hash password for a user
+     * @param user User with plain text password
+     * @return User with hashed password
+     */
+    private User hashPasswordForUser(User user) {
+        if (user.getPassword() == null || user.getPassword().isHashed()) {
+            return user;
+        }
+        
+        String hashedPassword = passwordEncoder.encode(user.getPassword().getValue());
+        
+        return user.toBuilder()
+                .password(Password.fromHash(hashedPassword))
+                .build();
     }
 }

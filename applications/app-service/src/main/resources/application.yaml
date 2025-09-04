@@ -12,6 +12,12 @@ spring:
   profiles:
     include: null
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: "https://idp.example.com/issuer"
+          client-id: "myclientid"
 management:
   endpoints:
     web:
@@ -33,3 +39,5 @@ adapters:
     schema: public
     username: postgres
     password: mysecretpassword
+jwt:
+  json-exp-roles: "/roles"

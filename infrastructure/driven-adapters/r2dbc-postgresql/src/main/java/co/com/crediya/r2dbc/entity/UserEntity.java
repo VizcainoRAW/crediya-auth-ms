@@ -47,6 +47,18 @@ public class UserEntity {
     @Column("base_salary")
     private BigDecimal baseSalary;
 
+    @Column("password_hash")
+    private String passwordHash;
+    
+    @Column("role")
+    private String role;
+    
+    @Column("document_type")
+    private String documentType;
+    
+    @Column("document_id")
+    private String documentId;
+
     @Override
     public String toString() {
         return "UserEntity{" +
@@ -54,6 +66,8 @@ public class UserEntity {
                 ", firstName='" + firstName + '\'' +
                 ", lastName='" + lastName + '\'' +
                 ", email='" + email + '\'' +
+                ", role='" + role + '\'' +
+                ", documentType='" + documentType + '\'' +
                 '}';
     }
 }
