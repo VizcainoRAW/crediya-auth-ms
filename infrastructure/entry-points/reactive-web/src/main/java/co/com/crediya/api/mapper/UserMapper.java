@@ -40,7 +40,7 @@ public class UserMapper {
             dto.phone(),
             new Email(dto.email()),         
             new BaseSalary(dto.baseSalary()),
-            null, // Password not available in DTO
+            null,
             dto.role() != null ? Role.fromCode(dto.role()) : Role.USER,
             dto.documentType() != null ? DocumentType.fromCode(dto.documentType()) : null,
             dto.documentId() != null ? new DocumentId(dto.documentId()) : null
@@ -59,7 +59,7 @@ public class UserMapper {
             user.getBaseSalary().getValue(),
             user.getRole() != null ? user.getRole().getCode() : null,
             user.getDocumentType() != null ? user.getDocumentType().getCode() : null,
-            user.getDocumentId() != null ? user.getDocumentId().getMaskedValue() : null // Masked for security
+            user.getDocumentId() != null ? user.getDocumentId().getMaskedValue() : null
         );
     }
 
@@ -71,7 +71,7 @@ public class UserMapper {
             user.getEmail().getValue(),
             user.getRole() != null ? user.getRole().getCode() : null,
             user.getDocumentType() != null ? user.getDocumentType().getCode() : null,
-            user.getDocumentId() != null ? user.getDocumentId().getMaskedValue() : null
+            user.getDocumentId() != null ? user.getDocumentId().getValue() : null
         );
     }
 
@@ -87,7 +87,7 @@ public class UserMapper {
             user.getBaseSalary().getValue(),
             user.getRole() != null ? user.getRole().getCode() : null,
             user.getDocumentType() != null ? user.getDocumentType().getCode() : null,
-            user.getDocumentId() != null ? user.getDocumentId().getValue() : null // Full value for admin
+            user.getDocumentId() != null ? user.getDocumentId().getValue() : null
         );
     }
 }

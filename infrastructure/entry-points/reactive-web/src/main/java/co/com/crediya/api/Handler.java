@@ -10,6 +10,7 @@ import reactor.core.publisher.Mono;
 
 import co.com.crediya.api.dto.ApiResponse;
 import co.com.crediya.api.dto.ErrorResponse;
+import co.com.crediya.api.dto.LoginRequestDTO;
 import co.com.crediya.api.dto.UserRequestDTO;
 import co.com.crediya.api.mapper.UserMapper;
 import co.com.crediya.model.user.exception.InvalidUserDataException;
@@ -209,7 +210,7 @@ public class Handler {
                     try {
                         Email email = new Email(dto.email());
                         return userUseCase.authenticateUser(email, dto.password())
-                                .map(UserMapper::toAuthDTO)
+                                .map(UserMapper::toDTOWithFullDocumentId)
                                 .map(authDto -> ApiResponse.success(authDto, "Authentication successful"))
                                 .flatMap(response -> ServerResponse.ok().bodyValue(response));
                     } catch (ValueObjectException e) {
@@ -268,6 +269,4 @@ public class Handler {
     private ErrorResponse createErrorResponse(String message, String errorCode, String path) {
         return new ErrorResponse(message, errorCode, LocalDateTime.now(), path);
     }
-
-    public record LoginRequestDTO(String email, String password) {}
 }
