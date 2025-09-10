@@ -18,6 +18,8 @@ spring:
         jwt:
           issuer-uri: "https://idp.example.com/issuer"
           client-id: "myclientid"
+          secret: "your-very-long-secret-key-that-should-be-at-least-256-bits-long-for-security-purposes-and-should-be-stored-securely"
+
 management:
   endpoints:
     web:
@@ -39,9 +41,12 @@ adapters:
     schema: public
     username: postgres
     password: mysecretpassword
+
 jwt:
   secret: "your-very-long-secret-key-that-should-be-at-least-256-bits-long-for-security-purposes-and-should-be-stored-securely"
   expiration-ms: 3600000
   refresh-expiration-ms: 86400000
   issuer: "crediya-api"
   json-exp-roles: roles
+  local-auth:
+    enabled: true

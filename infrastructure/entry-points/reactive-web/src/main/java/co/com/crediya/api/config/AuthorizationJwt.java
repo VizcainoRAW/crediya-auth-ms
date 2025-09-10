@@ -1,6 +1,5 @@
 package co.com.crediya.api.config;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -11,10 +10,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtClaimValidator;
-import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
@@ -24,10 +20,12 @@ import org.springframework.web.reactive.config.WebFluxConfigurer;
 import reactor.core.publisher.Mono;
 import org.springframework.http.HttpMethod;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import javax.crypto.spec.SecretKeySpec;
+
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
@@ -39,31 +37,45 @@ public class AuthorizationJwt implements WebFluxConfigurer {
     private final String issuerUri;
     private final String clientId;
     private final String jsonExpRoles;
-
+    private final boolean localAuthEnabled;
+    private final String jwtSecret;
     private final ObjectMapper mapper;
+    
     private static final String ROLE = "ROLE_";
     private static final String AZP = "azp";
 
     public AuthorizationJwt(@Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri,
                          @Value("${spring.security.oauth2.resourceserver.jwt.client-id}") String clientId,
                          @Value("${jwt.json-exp-roles}") String jsonExpRoles,
+                         @Value("${jwt.local-auth.enabled:false}") boolean localAuthEnabled,
+                         @Value("${spring.security.oauth2.resourceserver.jwt.secret}") String jwtSecret,
                          ObjectMapper mapper) {
         this.issuerUri = issuerUri;
         this.clientId = clientId;
         this.jsonExpRoles = jsonExpRoles;
+        this.localAuthEnabled = localAuthEnabled;
+        this.jwtSecret = jwtSecret;
         this.mapper = mapper;
     }
 
     @Bean
     public SecurityWebFilterChain filterChain(ServerHttpSecurity http) {
+
         http
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .authorizeExchange(auth -> auth
-                .pathMatchers(HttpMethod.POST, "/api/users").permitAll()
+                .pathMatchers(HttpMethod.POST, "/api/users").hasAnyRole("ADMIN")
                 .pathMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .pathMatchers(HttpMethod.GET, "/api/users/exists").permitAll()
                 .pathMatchers(HttpMethod.GET, "/api/users/{id}/exists").permitAll()
                 .pathMatchers(HttpMethod.GET, "/api/users/exists/by-id").permitAll()
+                .pathMatchers("/h2/**").permitAll()
+                .pathMatchers("/actuator/**").permitAll()
+
+                .pathMatchers(HttpMethod.DELETE, "/api/users/**").hasRole("ADMIN")
+
+                .pathMatchers(HttpMethod.GET, "/api/users/**").hasAnyRole("USER", "ADMIN")
+
                 .anyExchange().authenticated()
             )
             .oauth2ResourceServer(oauth2 ->
@@ -76,19 +88,11 @@ public class AuthorizationJwt implements WebFluxConfigurer {
         return http.build();
     }
 
-
-
+    @Bean
     public ReactiveJwtDecoder jwtDecoder() {
-        var defaultValidator = JwtValidators.createDefaultWithIssuer(issuerUri);
-        var audienceValidator = new JwtClaimValidator<String>(AZP,
-                azp -> azp != null && !azp.isEmpty() && azp.equals(clientId));
-        var tokenValidator = new DelegatingOAuth2TokenValidator<>(defaultValidator, audienceValidator);
-        var jwtDecoder = NimbusReactiveJwtDecoder
-                .withIssuerLocation(issuerUri)
-                .build();
-
-        jwtDecoder.setJwtValidator(tokenValidator);
-        return jwtDecoder;
+        return NimbusReactiveJwtDecoder.withSecretKey(
+            new SecretKeySpec(jwtSecret.getBytes(), "HmacSHA256")
+        ).build();
     }
 
     public Converter<Jwt, Mono<AbstractAuthenticationToken>> grantedAuthoritiesExtractor() {
@@ -102,16 +106,11 @@ public class AuthorizationJwt implements WebFluxConfigurer {
         return new ReactiveJwtAuthenticationConverterAdapter(jwtConverter);
     }
 
-    private List<String> getRoles(Map<String, Object> claims, String jsonExpClaim){
-        List<String> roles = List.of();
-        try {
-            var json = mapper.writeValueAsString(claims);
-            var chunk = mapper.readTree(json).at(jsonExpClaim);
-            return mapper.readerFor(new TypeReference<List<String>>() {})
-                    .readValue(chunk);
-        } catch (IOException e) {
-            log.error(e.getMessage());
-            return roles;
+    private List<String> getRoles(Map<String, Object> claims, String jsonExpClaim) {
+        Object role = claims.get("role");
+        if (role == null) {
+            return List.of();
         }
+        return List.of(role.toString());
     }
 }
