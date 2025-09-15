@@ -28,6 +28,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import lombok.extern.log4j.Log4j2;
 
+@SuppressWarnings("unused")
 @Log4j2
 @Configuration
 @EnableWebFluxSecurity

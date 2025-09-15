@@ -12,7 +12,6 @@ import co.com.crediya.api.dto.ApiResponse;
 import co.com.crediya.api.dto.ErrorResponse;
 import co.com.crediya.api.dto.LoginRequestDTO;
 import co.com.crediya.api.dto.LoginResponseDTO;
-import co.com.crediya.api.dto.UserAuthDTO;
 import co.com.crediya.api.dto.UserRequestDTO;
 import co.com.crediya.api.mapper.UserMapper;
 import co.com.crediya.model.user.exception.InvalidUserDataException;
@@ -210,27 +209,19 @@ public class Handler {
         return request.bodyToMono(LoginRequestDTO.class)
                 .flatMap(dto -> {
                     log.debug("Authenticating user: {}", dto.email());
-                    try {
-                        Email email = new Email(dto.email());
-                        return userUseCase.authenticateUser(email, dto.password())
-                                .map(user -> {
-                                    UserAuthDTO authDTO = UserMapper.toAuthDTO(user);
-                                    String accessToken = jwtService.generateAccessToken(authDTO);
-                                    String refreshToken = jwtService.generateRefreshToken(user.getId());
-                                    return new LoginResponseDTO(
+                    Email email = new Email(dto.email());
+                    return userUseCase.authenticateUser(email, dto.password())
+                            .map(user -> {
+                                String accessToken = jwtService.generateAccessToken(user.getId());
+                                String refreshToken = jwtService.generateRefreshToken(user.getId());
+                                return new LoginResponseDTO(
                                             accessToken,
                                             refreshToken,
-                                            jwtService.getExpirationMs(),
-                                            authDTO
+                                            jwtService.getExpirationMs()
                                     );
                                 })
                                 .map(response -> ApiResponse.success(response, "Authentication successful"))
                                 .flatMap(response -> ServerResponse.ok().bodyValue(response));
-                    } catch (ValueObjectException e) {
-                        log.warn("Invalid email format: {}", dto.email());
-                        return ServerResponse.badRequest()
-                                .bodyValue(ApiResponse.error("Invalid email format"));
-                    }
                 })
                 .onErrorResume(throwable -> handleError(throwable, request.path()));
     }

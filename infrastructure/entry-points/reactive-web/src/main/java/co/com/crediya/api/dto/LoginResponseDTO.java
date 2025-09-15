@@ -7,10 +7,9 @@ public record LoginResponseDTO(
     String refreshToken,
     String tokenType,
     Long expiresIn,
-    UserAuthDTO user,
     LocalDateTime loginTime
 ) {
-    public LoginResponseDTO(String accessToken, String refreshToken, Long expiresIn, UserAuthDTO user) {
-        this(accessToken, refreshToken, "Bearer", expiresIn, user, LocalDateTime.now());
+    public LoginResponseDTO(String accessToken, String refreshToken, Long expiresIn) {
+        this(accessToken, refreshToken, "Bearer", expiresIn, LocalDateTime.now());
     }
 }

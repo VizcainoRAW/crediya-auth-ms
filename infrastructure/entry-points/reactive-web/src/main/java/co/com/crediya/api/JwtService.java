@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import co.com.crediya.api.dto.TokenValidationResponseDTO;
 import co.com.crediya.api.dto.UserAuthDTO;
+import co.com.crediya.api.dto.UserDTO;
 
 @Service
 public class JwtService {
@@ -32,6 +33,38 @@ public class JwtService {
         this.refreshExpirationMs = refreshExpirationMs;
         this.issuer = issuer;
     }
+
+    public String generateAccessToken(String userId){
+        Instant now = Instant.now();
+        return Jwts.builder()
+                .setId(UUID.randomUUID().toString())
+                .setSubject(userId)
+                .setIssuer(issuer)
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(now.plusMillis(expirationMs)))
+                .claim("userId", userId)
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String generateAccessToken(UserDTO userDTO) {
+        Instant now = Instant.now();
+        return Jwts.builder()
+                .setId(UUID.randomUUID().toString())
+                .setSubject(userDTO.id())
+                .setIssuer(issuer)
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(now.plusMillis(expirationMs)))
+                .claim("email", userDTO.email())
+                .claim("role", userDTO.role())
+                .claim("firstName", userDTO.firstName())
+                .claim("lastName", userDTO.lastName())
+                .claim("documendType", userDTO.documentType())
+                .claim("documendId", userDTO.documentId())
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
 
     public String generateAccessToken(UserAuthDTO user) {
         Instant now = Instant.now();
