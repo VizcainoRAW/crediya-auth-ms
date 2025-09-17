@@ -2,7 +2,12 @@ package co.com.crediya.api;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.factory.annotation.Value;
+import co.com.crediya.api.Exception.JwtValidationException;
+import co.com.crediya.api.Exception.TokenExpiredException;
+
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
@@ -10,10 +15,11 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
 
-import co.com.crediya.api.dto.TokenValidationResponseDTO;
+import co.com.crediya.api.dto.TokenValidationRequestDTO;
 import co.com.crediya.api.dto.UserAuthDTO;
 import co.com.crediya.api.dto.UserDTO;
 
+@Slf4j
 @Service
 public class JwtService {
 
@@ -110,29 +116,74 @@ public class JwtService {
         return refreshExpirationMs;
     }
 
-    public TokenValidationResponseDTO validateToken(String token) {
-        try {
-            // acepta token con o sin prefijo Bearer
-            if (token.startsWith("Bearer ")) {
-                token = token.substring(7);
-            }
+    public Claims getTokenClaims(TokenValidationRequestDTO dto){
+        return getTokenClaims(dto.token());
+    }
 
-            Jws<Claims> jws = parseToken(token);
-            Claims claims = jws.getBody();
-
-            String userId = claims.getSubject();
-            String email = claims.get("email", String.class);
-            String role = claims.get("role", String.class);
-            Date exp = claims.getExpiration();
-            long expiresInSeconds = (exp.getTime() - System.currentTimeMillis()) / 1000L;
-
-            if (expiresInSeconds < 0) {
-                return TokenValidationResponseDTO.invalid("Token expired");
-            }
-
-            return TokenValidationResponseDTO.valid(userId, email, role, expiresInSeconds);
-        } catch (JwtException | IllegalArgumentException e) {
-            return TokenValidationResponseDTO.invalid("Invalid token: " + e.getMessage());
+    public Claims getTokenClaims(String token) {
+        if (token == null || token.trim().isEmpty()) {
+            throw new JwtValidationException("Token cannot be null or empty");
         }
+            try {
+                Claims claims = Jwts.parserBuilder()
+                        .setSigningKey(key)
+                        .requireIssuer(issuer)
+                        .build()
+                        .parseClaimsJws(token)
+                        .getBody();
+
+                validateTokenClaims(claims);
+                return claims;
+
+            } catch (ExpiredJwtException ex) {
+                log.warn("Token has expired: {}", ex.getMessage());
+                throw new TokenExpiredException("Token has expired at: " + ex.getClaims().getExpiration());
+                
+            } catch (UnsupportedJwtException ex) {
+                log.error("Unsupported JWT token: {}", ex.getMessage());
+                throw new JwtValidationException("Unsupported JWT token");
+                
+            } catch (MalformedJwtException ex) {
+                log.error("Malformed JWT token: {}", ex.getMessage());
+                throw new JwtValidationException("Malformed JWT token");
+                
+            } catch (io.jsonwebtoken.security.SignatureException ex) {
+                log.error("Invalid JWT signature: {}", ex.getMessage());
+                throw new JwtValidationException("Invalid JWT signature");
+                
+            } catch (IllegalArgumentException ex) {
+                log.error("JWT token compact of handler are invalid: {}", ex.getMessage());
+                throw new JwtValidationException("Invalid JWT token");
+                
+            } catch (Exception ex) {
+                log.error("Unexpected error validating JWT token: {}", ex.getMessage(), ex);
+                throw new JwtValidationException("Token validation failed: " + ex.getMessage());
+            }
+        }
+    
+    private void validateTokenClaims(Claims claims) {
+        if (claims.getSubject() == null || claims.getSubject().trim().isEmpty()) {
+            throw new JwtValidationException("Token missing required subject claim");
+        }
+
+        if (claims.getIssuedAt() == null) {
+            throw new JwtValidationException("Token missing issued at claim");
+        }
+
+        if (claims.getIssuedAt().after(new Date())) {
+            throw new JwtValidationException("Token issued in the future");
+        }
+
+        if (claims.get("nbf") != null) {
+            Date notBefore = new Date(((Number) claims.get("nbf")).longValue() * 1000);
+            if (notBefore.after(new Date())) {
+                throw new JwtValidationException("Token not yet valid");
+            }
+        }
+    }
+
+    public long getRemainingExpirationTime(Claims claims) {
+        Date expiration = claims.getExpiration();
+        return Math.max(0, expiration.getTime() - System.currentTimeMillis());
     }
 }

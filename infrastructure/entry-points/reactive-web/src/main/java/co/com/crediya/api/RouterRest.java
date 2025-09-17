@@ -15,6 +15,7 @@ public class RouterRest {
     public RouterFunction<ServerResponse> routerFunction(Handler handler) {
         return route(POST("/api/users"), handler::createUser)
                 .andRoute(POST("/api/auth/login"), handler::authenticateUser)
+                .andRoute(POST("/api/auth/validate-token"), handler::validateToken)
                 .andRoute(GET("/api/users"), handler::getAllUsers)
                 .andRoute(GET("/api/users/{id}"), handler::getUserById)
                 .andRoute(GET("/api/users/search"), handler::getUserByEmail)

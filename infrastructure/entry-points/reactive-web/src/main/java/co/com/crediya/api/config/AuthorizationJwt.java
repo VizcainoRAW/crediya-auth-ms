@@ -66,6 +66,7 @@ public class AuthorizationJwt implements WebFluxConfigurer {
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .authorizeExchange(auth -> auth
                 .pathMatchers(HttpMethod.POST, "/api/users").hasAnyRole("ADMIN")
+                .pathMatchers(HttpMethod.POST,"/api/auth/validate-token").permitAll()
                 .pathMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .pathMatchers(HttpMethod.GET, "/api/users/exists").permitAll()
                 .pathMatchers(HttpMethod.GET, "/api/users/{id}/exists").permitAll()

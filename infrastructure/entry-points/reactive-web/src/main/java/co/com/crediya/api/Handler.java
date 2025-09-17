@@ -12,6 +12,8 @@ import co.com.crediya.api.dto.ApiResponse;
 import co.com.crediya.api.dto.ErrorResponse;
 import co.com.crediya.api.dto.LoginRequestDTO;
 import co.com.crediya.api.dto.LoginResponseDTO;
+import co.com.crediya.api.dto.TokenValidationRequestDTO;
+import co.com.crediya.api.dto.TokenValidationResponseDTO;
 import co.com.crediya.api.dto.UserRequestDTO;
 import co.com.crediya.api.mapper.UserMapper;
 import co.com.crediya.model.user.exception.InvalidUserDataException;
@@ -20,6 +22,7 @@ import co.com.crediya.model.user.exception.UserNotFoundException;
 import co.com.crediya.model.valueobject.DocumentId;
 import co.com.crediya.model.valueobject.Email;
 import co.com.crediya.model.valueobject.exception.ValueObjectException;
+import io.jsonwebtoken.Claims;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -223,6 +226,21 @@ public class Handler {
                                 .map(response -> ApiResponse.success(response, "Authentication successful"))
                                 .flatMap(response -> ServerResponse.ok().bodyValue(response));
                 })
+                .onErrorResume(throwable -> handleError(throwable, request.path()));
+    }
+
+    public Mono<ServerResponse> validateToken(ServerRequest request) {
+        return request.bodyToMono(TokenValidationRequestDTO.class)
+                .flatMap(dto -> {
+                    Claims claims = jwtService.getTokenClaims(dto.token());
+                    long remainingTime = jwtService.getRemainingExpirationTime(claims);
+                    
+                    return userUseCase.findUserById(claims.getSubject())
+                            .map(UserMapper::toDTOWithFullDocumentId)
+                            .map(userDTO -> TokenValidationResponseDTO.valid(userDTO, remainingTime));
+                })
+                .map(response -> ApiResponse.success(response, "Token validation completed"))
+                .flatMap(response -> ServerResponse.ok().bodyValue(response))
                 .onErrorResume(throwable -> handleError(throwable, request.path()));
     }
 
