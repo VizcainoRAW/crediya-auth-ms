@@ -3,7 +3,7 @@ package co.com.crediya.model.user;
 public enum Role {
     ADMIN("ADMIN", "Administrator with full access"),
     USER("USER", "Regular user with standard access"),
-    ADVISER("EMPLOYEE", "Company employee");
+    ADVISOR("ADVISOR", "Company employee - advisor");
 
     private final String code;
     private final String description;
