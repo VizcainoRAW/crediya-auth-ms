@@ -215,7 +215,7 @@ public class Handler {
                     Email email = new Email(dto.email());
                     return userUseCase.authenticateUser(email, dto.password())
                             .map(user -> {
-                                String accessToken = jwtService.generateAccessToken(user.getId());
+                                String accessToken = jwtService.generateAccessToken(user.getId(), user.getRole());
                                 String refreshToken = jwtService.generateRefreshToken(user.getId());
                                 return new LoginResponseDTO(
                                             accessToken,

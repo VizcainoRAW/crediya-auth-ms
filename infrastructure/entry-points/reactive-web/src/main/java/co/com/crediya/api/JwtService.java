@@ -18,6 +18,7 @@ import java.util.UUID;
 import co.com.crediya.api.dto.TokenValidationRequestDTO;
 import co.com.crediya.api.dto.UserAuthDTO;
 import co.com.crediya.api.dto.UserDTO;
+import co.com.crediya.model.user.Role;
 
 @Slf4j
 @Service
@@ -49,6 +50,20 @@ public class JwtService {
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(now.plusMillis(expirationMs)))
                 .claim("userId", userId)
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String generateAccessToken(String userId, Role role){
+        Instant now = Instant.now();
+        return Jwts.builder()
+                .setId(UUID.randomUUID().toString())
+                .setSubject(userId)
+                .setIssuer(issuer)
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(now.plusMillis(expirationMs)))
+                .claim("userId", userId)
+                .claim("role", role.getCode())
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
